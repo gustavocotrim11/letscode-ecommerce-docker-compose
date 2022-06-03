@@ -1,0 +1,144 @@
+version: "3.9"
+services:
+  #Eureka
+  eureka-server:
+    image: springcloud/eureka
+    ports:
+      - "8761:8761"
+    container_name: "eureka-server"
+    networks:
+      services-network-01:
+        aliases:
+          - eureka-server
+
+  #API Gateway
+  api-gateway:
+    image: maiostri/api-gateway
+    ports:
+      - "8080:8080"
+    container_name: "api-gateway"
+    networks:
+      - services-network-01
+    depends_on:
+      - eureka-server
+
+  #Prometheus
+  prometheus:
+    image: "prom/prometheus"
+    container_name: "prometheus-app"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/:/etc/prometheus
+      - ./prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  #Grafana
+  grafana:
+    container_name: "grafana"
+    image: grafana/grafana:latest
+    volumes:
+      - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+
+  # Users MySQL
+  users-mysql:
+    image: "mysql:latest"
+    restart: always
+    container_name: "users-mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: users
+    ports:
+      - "3306:3306"
+    networks:
+      services-network-01:
+        aliases:
+          - users-mysql
+
+  # Products MySQL
+  products-mysql:
+    image: "mysql:latest"
+    restart: always
+    container_name: "products-mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: products
+    ports:
+      - "3307:3306"
+    networks:
+      services-network-01:
+        aliases:
+          - products-mysql
+
+  # Carts Mongo
+  shoppingcarts-mongo:
+    image: "mongo:latest"
+    restart: always
+    container_name: "shoppingcarts-mongo"
+    networks:
+      services-network-01:
+        aliases:
+          - shoppingcarts-mongo
+
+  # Users API
+  users-app:
+    image: "users-app-image"
+    ports:
+      - "8080:80"
+    depends_on:
+      - users-mysql
+      - eureka-server
+    container_name: "users-app-instance"
+    networks:
+      services-network-01:
+        aliases:
+          - users-service
+
+  # Products API
+  products-app:
+    image: "products-app-image"
+    ports:
+      - "8081:80"
+    depends_on:
+      - products-mysql
+      - eureka-server
+    container_name: "products-app-instance"
+    networks:
+      services-network-01:
+        aliases:
+          - products-service
+
+  # Carts API
+  shoppingcarts-app:
+    image: "shoppingcarts-app-image"
+    ports:
+      - "8082:8082"
+    depends_on:
+      - shoppingcarts-mongo
+      - eureka-server
+      - users-app
+      - products-app
+    container_name: "shoppingcarts-app-instance"
+    networks:
+      services-network-01:
+        aliases:
+          - shoppingcarts-service
+
+
+
+networks:
+  services-network-01:
+    name: services-network-01
+    driver: bridge
+  
+
+
+
+
